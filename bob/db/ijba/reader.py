@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # vim: set fileencoding=utf-8 :
 # @author: Tiago de Freitas Pereira <tiago.pereira@idiap.ch>
-# @date:   Thu 18 Feb 2016 15:23:45 CET 
+# @date:   Thu 18 Feb 2016 15:23:45 CET
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,9 +29,9 @@ import bob.db.base
 class File(bob.db.base.File):
   """
   IJBA File class
-  
+
   Diferent from its ascendent class, this one has the client ID as input
-  
+
   """
   def __init__(self, client_id, path, file_id = None):
     """**Constructor Documentation**
@@ -58,7 +58,7 @@ class File(bob.db.base.File):
     """
     super(File, self).__init__(path, file_id)
     self.client_id = client_id
-    
+
 
 
 class Template():
@@ -81,14 +81,14 @@ ique key for querying the database.
 
 
 def read_file(filename):
-  """Reads the given file and yields the template id, the subject id and path_id (path + sighting_id)"""
-    
+  """Reads the given file and yields the template id, the subject id and path_id (path + client_id)"""
+
   with open(filename) as f:
     # skip the first line
     _ = f.readline()
     for line in f:
       splits = line.rstrip().split(',')
-      
+
       assert len(splits) == 25
 
 
@@ -97,16 +97,15 @@ def read_file(filename):
       client_id   = int(splits[1])
 
       path,extension     = os.path.splitext(splits[2])
-      sighting_id = splits[4]
-      file_id     = "%s-%s" % (path, sighting_id)
+      file_id     = "%s-%d" % (path, client_id)
 
       #Creating the file object and binding the annotations directly to the object
       file_obj = File(client_id, path, file_id)
       annotations = read_annotations(splits[6:])
-      
+
       file_obj.annotations = annotations
       file_obj.extension   = extension
-      file_obj.media_id    = splits[3]        
+      file_obj.media_id    = splits[3]
 
       yield template_id, client_id, file_obj
 
@@ -121,7 +120,7 @@ def get_comparisons(filename):
 
   for line in lines:
 
-    splits = line.rstrip().split(',')      
+    splits = line.rstrip().split(',')
     assert len(splits) == 2
 
     template_A = int(splits[0])
@@ -131,33 +130,33 @@ def get_comparisons(filename):
       template_comparisons[template_A] = [template_B]
     else:
       template_comparisons[template_A].append(template_B)
-      
+
   return template_comparisons
-  
+
 
 
 def get_templates(filename,  verbose=True):
   """
   Given a IJBA file, get a dictionary with all their templates with their respective files in the following format:
-  
-  
+
+
   templates['template_01'] = [file_01, file_02, file_03]
   templates['template_02'] = [file_01, file_02, file_03]
   .
   .
   .
-  
-  """  
+
+  """
 
   templates       = {}
   for template_id, client_id, file_obj in read_file(filename):
 
-    # create template with given IDs 
+    # create template with given IDs
     if template_id not in templates:
       templates[template_id] = Template(template_id,client_id,[file_obj])
     else:
       templates[template_id].files.append(file_obj)
-    
+
   return templates
 
 
@@ -181,7 +180,7 @@ def read_annotations(raw_annotations):
   n_x    = float(raw_annotations[8]) if raw_annotations[8]!='' else None
   n_y    = float(raw_annotations[9]) if raw_annotations[9]!='' else None
   yaw    = float(raw_annotations[10]) if raw_annotations[10]!='' else None
-    
+
   forehead = raw_annotations[17-6]
   eyes     = raw_annotations[18-6]
   nm       = raw_annotations[19-6]
@@ -208,5 +207,3 @@ def read_annotations(raw_annotations):
   if yaw is not None: annotations['yaw'] = yaw
 
   return annotations
-
-
