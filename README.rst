@@ -13,8 +13,6 @@
    :target: https://gitlab.idiap.ch/bob/bob.db.ijba
 .. image:: http://img.shields.io/pypi/v/bob.db.ijba.svg
    :target: https://pypi.python.org/pypi/bob.db.ijba
-.. image:: http://img.shields.io/pypi/dm/bob.db.ijba.svg
-   :target: https://pypi.python.org/pypi/bob.db.ijba
 
 
 ==================================
