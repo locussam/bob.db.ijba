@@ -102,21 +102,21 @@ def compute_comparison(args, directories):
                                                              str(round(fnmr_2.nonorm_dev,5)*100),
                                                              "split {0}".format(split))
       grid +=  "+-----------------+-----------------+-----------------+-----------------+--------------------------+\n"
-      return grid
+    return grid
 
-    def compute_fnmr(args_augmented, directories):
-      fnmr = []  
-      for f in far_thresholds:
-        args_augmented.criterion = "FAR"
-        args_augmented.far_threshold = f
-        
-        # Computing TPIR
-        frr = search_results(args_augmented, directories)
-        for rr in frr:
-          rr.nonorm_dev = 1.-rr.nonorm_dev
-        fnmr.append(frr)
+  def compute_fnmr(args_augmented, directories):
+    fnmr = []  
+    for f in far_thresholds:
+      args_augmented.criterion = "FAR"
+      args_augmented.far_threshold = f
+      
+      # Computing TPIR
+      frr = search_results(args_augmented, directories)
+      for rr in frr:
+        rr.nonorm_dev = 1.-rr.nonorm_dev
+      fnmr.append(frr)
 
-      return fnmr
+    return fnmr
 
 
   args_augmented = args
