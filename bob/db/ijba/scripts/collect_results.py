@@ -5,22 +5,29 @@
 from __future__ import print_function
 
 """
-This script parses through the given directory, collects all results of
-verification experiments that are stored in file with the given file name.
-It supports the split into development and test set of the data, as well as
-ZT-normalized scores.
+This script parses through the given directory, collects all results of 
+experiments using bob.db.ijba and dumps a nice copy/paste rst text.
 
-All result files are parsed and evaluated. For each directory, the following
-information are given in columns:
+It supports comparison (--report-type comparison) and search  (--report-type search) experiments
 
-  * The Equal Error Rate of the development set
-  * The Equal Error Rate of the development set after ZT-Normalization
-  * The Half Total Error Rate of the evaluation set
-  * The Half Total Error Rate of the evaluation set after ZT-Normalization
-  * The sub-directory where the scores can be found
+For comparison, we have a RST table like this:
 
-The measure type of the development set can be changed to compute "HTER" or
-"FAR" thresholds instead, using the --criterion option.
++-----------------+-----------------+-----------------+-----------------+--------------------------+
+|    CMC% (R=1)   | TPIR% (FAR=0.1) | TPIR% (FAR=0.01)|TPIR% (FAR=0.001)| split                    |
++=================+=================+=================+=================+==========================+
+|   00000         |0000000          |00000000         |00000            |split 0                   |
++-----------------+-----------------+-----------------+-----------------+--------------------------+
+|                                                                                                  |
+
+
+For search, we have a RST table like this:
+
++-----------------+-----------------+-----------------+--------------------------+
+| DIR% (FAR=0.1)  | DIR% (FAR=0.01) | DIR% (FAR=0.001)| split                    |
++=================+=================+=================+==========================+
+|   00000         |000000           |0000000          |00000000                  |
+
+
 """
 
 
@@ -33,21 +40,8 @@ import bob.core
 logger = bob.core.log.setup("bob.bio.base")
 
 from bob.bio.base.script.collect_results import Result, recurse, add_results
-#, command_line_arguments
 
 far_thresholds = [0.1, 0.01, 0.001]
-
-
-
-def table(results):
-  """Generates a table containing all results in a nice format."""
-  A = " "*2 + 'dev  nonorm'+ " "*5 + 'dev  ztnorm' + " "*6 + 'eval nonorm' + " "*4 + 'eval ztnorm' + " "*12 + 'directory\n'
-  A += "-"*100+"\n"
-  for r in results:
-    if r.valid():
-      A += str(r) + "\n"
-  return A
-
 
 def command_line_arguments(command_line_parameters):
   """Parse the program options"""
@@ -58,7 +52,7 @@ def command_line_arguments(command_line_parameters):
 
   parser.add_argument('-D', '--directory', default=".", help = "The directory where the results should be collected from; might include search patterns as '*'.")
   parser.add_argument('-o', '--output', help = "Name of the output file that will contain the EER/HTER scores")
-  parser.add_argument('-r', '--report-type', type=str, default="comparison", choices=("comparison", "search"), help = "Type of the report. For `comparison`, CMC(rank=1) and TPIR (FAR=[0.1, 0.01 and 0.001] ) will be reported. For the search DIR (rank=1) and TPIR (FAR=[0.1, 0.01 and 0.001] is reported")
+  parser.add_argument('-r', '--report-type', default="comparison", choices=("comparison", "search"), help = "Type of the report. For `comparison`, CMC(rank=1) and TPIR (FAR=[0.1, 0.01 and 0.001] ) will be reported. For the search DIR (rank=1) and TPIR (FAR=[0.1, 0.01 and 0.001] is reported")
 
   parser.add_argument('--self-test', action='store_true', help=argparse.SUPPRESS)
 
@@ -84,13 +78,16 @@ def search_results(args, directories):
 
   return results
   
-
+def compute_mean_std(results):
+    return numpy.mean([r.nonorm_dev for r in results]), numpy.std([r.nonorm_dev for r in results])
+    
 def compute_comparison(args, directories):
   """
   Plot evaluation table for the comparison protocol
   """
 
   def plot_comparison_table(cmc_r1, fnmr):
+  
     grid =  "+-----------------+-----------------+-----------------+-----------------+--------------------------+\n"
     grid += "|    CMC% (R=1)   | TPIR% (FAR=0.1) | TPIR% (FAR=0.01)|TPIR% (FAR=0.001)| split                    |\n"
     grid += "+=================+=================+=================+=================+==========================+\n"
@@ -102,16 +99,29 @@ def compute_comparison(args, directories):
                                                              str(round(fnmr_2.nonorm_dev,5)*100),
                                                              "split {0}".format(split))
       grid +=  "+-----------------+-----------------+-----------------+-----------------+--------------------------+\n"
+
+    cmc = compute_mean_std(cmc_r1)
+    fnmr_0 = compute_mean_std(fnmr[0])
+    fnmr_1 = compute_mean_std(fnmr[1])
+    fnmr_2 = compute_mean_std(fnmr[2])   
+    grid += "|**{:6s}({:5s})**|**{:6s}({:5s})**|**{:6s}({:5s})**|**{:6s}({:5s})**|{:26s}|\n".format(
+                                                           str(round(cmc[0],4)*100),str(round(cmc[1],4)*100),
+                                                           str(round(fnmr_0[0],4)*100),str(round(fnmr_0[1],4)*100),
+                                                           str(round(fnmr_1[0],4)*100),str(round(fnmr_1[1],4)*100),
+                                                           str(round(fnmr_2[0],4)*100),str(round(fnmr_2[1],4)*100),
+                                                           "mean(std)")
+    grid +=  "+-----------------+-----------------+-----------------+-----------------+--------------------------+\n"    
+                  
     return grid
 
-  def compute_fnmr(args_augmented, directories):
+  def compute_fnmr(args, directories):
     fnmr = []  
     for f in far_thresholds:
-      args_augmented.criterion = "FAR"
-      args_augmented.far_threshold = f
+      args.criterion = "FAR"
+      args.far_threshold = f
       
       # Computing TPIR
-      frr = search_results(args_augmented, directories)
+      frr = search_results(args, directories)
       for rr in frr:
         rr.nonorm_dev = 1.-rr.nonorm_dev
       fnmr.append(frr)
@@ -119,11 +129,11 @@ def compute_comparison(args, directories):
     return fnmr
 
 
-  args_augmented = args
-  args_augmented.rank = 1
-  args_augmented.criterion = "RR"
-  cmc_r1 = search_results(args_augmented, directories)
-  fnmr = compute_fnmr(args_augmented, directories)
+  args = args
+  args.rank = 1
+  args.criterion = "RR"
+  cmc_r1 = search_results(args, directories)
+  fnmr = compute_fnmr(args, directories)
   return plot_comparison_table(cmc_r1, fnmr)
 
 
@@ -144,23 +154,34 @@ def compute_search(args, directories):
                                                        str(round(dira_2.nonorm_dev,5)*100),
                                                        "split {0}".format(split))
       grid +=  "+-----------------+-----------------+-----------------+--------------------------+\n"
+
+    dira_0 = compute_mean_std(dira[0])
+    dira_1 = compute_mean_std(dira[1])
+    dira_2 = compute_mean_std(dira[2])
+    grid += "|**{:6s}({:5s})**|**{:6s}({:5s})**|**{:6s}({:5s})**|{:26s}|\n".format(
+                                                           str(round(dira_0[0],4)*100),str(round(dira_0[1],4)*100),
+                                                           str(round(dira_1[0],4)*100),str(round(dira_1[1],4)*100),
+                                                           str(round(dira_2[0],4)*100),str(round(dira_2[1],4)*100),
+                                                           "mean(std)")
+    grid +=  "+-----------------+-----------------+-----------------+--------------------------+\n"
+
     return grid
 
-  def compute_dir(args_augmented, directories):
+  def compute_dir(args, directories):
     dira = []  
     for f in far_thresholds:
-      args_augmented.criterion = "DIR"
-      args_augmented.far_threshold = f      
-      dira.append(search_results(args_augmented, directories))
+      args.criterion = "DIR"
+      args.far_threshold = f      
+      dira.append(search_results(args, directories))
 
     return dira
 
 
-  args_augmented = args
-  args_augmented.rank = 1
-  args_augmented.criterion = "DIR"
+  args = args
+  args.rank = 1
+  args.criterion = "DIR"
 
-  dira = compute_dir(args_augmented, directories)
+  dira = compute_dir(args, directories)
   return plot_search_table(dira)
 
 
